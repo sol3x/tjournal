@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ژورنال معاملاتی </title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.2/dist/dexie.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4a5568; --secondary-color: #718096; --accent-color: #a0c4ff;
+            --accent-hover: #91baff; --background-color: #f7fafc; --surface-color: #ffffff;
+            --text-primary: #2d3748; --text-secondary: #718096; --border-color: #e2e8f0;
+            --positive: #48bb78; --negative: #f56565; --transition: all 0.3s ease-in-out;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Vazirmatn', sans-serif; }
+        body { background: var(--background-color); color: var(--text-primary); }
+        .app-container { display: flex; min-height: 100vh; }
+        .sidebar {
+            width: 260px; background: var(--surface-color); padding: 25px 15px;
+            display: flex; flex-direction: column; transition: var(--transition);
+            border-left: 1px solid var(--border-color);
+        }
+        .sidebar-header { text-align: center; margin-bottom: 20px; }
+        .sidebar-header h2 { font-size: 1.8rem; color: var(--primary-color); }
+        .sidebar-header p { font-size: 0.9rem; color: var(--text-secondary); }
+        .account-switcher { margin-bottom: 20px; padding: 0 10px; }
+        .account-switcher label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px; display: block; }
+        .nav-menu { list-style: none; flex-grow: 1; }
+        .nav-item a {
+            display: flex; align-items: center; padding: 15px; border-radius: 8px;
+            color: var(--text-secondary); text-decoration: none; margin-bottom: 10px;
+            transition: var(--transition); font-weight: 500;
+        }
+        .nav-item a i { font-size: 1.2rem; margin-left: 15px; width: 25px; }
+        .nav-item a:hover { background-color: #edf2f7; color: var(--primary-color); }
+        .nav-item a.active {
+            background-color: var(--accent-color); color: var(--primary-color); font-weight: 600;
+            box-shadow: 0 4px 10px rgba(160, 196, 255, 0.4);
+        }
+        .Dev{ font-size: 0.7rem; margin-left: 15px; direction: ltr; text-align: center;}
+        .main-content { flex-grow: 1; padding: 30px; overflow-y: auto; height: 100vh; }
+        .page { display: none; }
+        .page.active { display: block; animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .header h1 { font-size: 2.2rem; color: var(--text-primary); }
+        .menu-toggle { display: none; background: none; border: none; color: var(--primary-color); font-size: 1.8rem; cursor: pointer; }
+        .card { background: var(--surface-color); border-radius: 12px; padding: 25px; border: 1px solid var(--border-color); margin-bottom: 25px; box-shadow: var(--shadow); }
+        .card-title { font-size: 1.5rem; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); color: var(--primary-color); }
+        input, select, textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: #f7fafc; color: var(--text-primary); font-size: 1rem; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(160, 196, 255, 0.5); }
+        button { background: var(--accent-color); color: var(--primary-color); border: none; padding: 12px 25px; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: var(--transition); }
+        button:hover { background: var(--accent-hover); box-shadow: 0 4px 12px rgba(160, 196, 255, 0.5); transform: translateY(-2px); }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .stat-card { background: #edf2f7; text-align: center; padding: 20px; border-radius: 10px; }
+        .stat-label { font-size: 1rem; color: var(--text-secondary); }
+        .stat-value { font-size: 2rem; font-weight: 700; margin: 5px 0; color: var(--primary-color); }
+        .table-container { overflow-x: auto; }
+        .trades-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .trades-table th, .trades-table td { padding: 14px; text-align: right; border-bottom: 1px solid var(--border-color); }
+        .trades-table th { background: #f7fafc; color: var(--text-secondary); white-space: nowrap; }
+        .buy { color: var(--positive); } .sell { color: var(--negative); }
+        .profit { color: var(--positive); font-weight: 600; } .loss { color: var(--negative); font-weight: 600; }
+        .action-btn { background: none; border: none; padding: 5px; cursor: pointer; color: var(--text-secondary); font-size: 1.1rem; }
+        .tag { background-color: #e2e8f0; color: #4a5568; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; margin: 2px; display: inline-block;}
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; display: none; align-items: center; justify-content: center; }
+        .modal-content { background: var(--surface-color); border-radius: 12px; padding: 30px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative; }
+        .modal-close { position: absolute; top: 15px; left: 20px; font-size: 2rem; cursor: pointer; color: var(--text-secondary); border: none; background: none;}
+        .modal-details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .modal-details-grid div { background: #f7fafc; padding: 10px; border-radius: 8px;}
+        .modal-details-grid strong { display: block; color: var(--primary-color); margin-bottom: 5px;}
+        .modal-image { max-width: 100%; border-radius: 8px; margin-top: 20px; border: 1px solid var(--border-color); }
+        @media (max-width: 992px) { .sidebar { position: fixed; top: 0; right: -280px; height: 100%; z-index: 1000; box-shadow: -5px 0 15px rgba(0,0,0,0.1); } .sidebar.active { right: 0; } .menu-toggle { display: block; } }
+        @media (max-width: 600px) { .modal-details-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-chart-line"></i></h2>
+                <p>ژورنال معاملاتی</p>
+            </div>
+            <div class="account-switcher">
+                <label for="accountSelector">انتخاب حساب</label>
+                <select id="accountSelector"></select>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item"><a href="#" class="nav-link active" data-page="dashboard"><i class="fas fa-tachometer-alt"></i> داشبورد</a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-page="add-trade"><i class="fas fa-plus-circle"></i> ثبت معامله</a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-page="history"><i class="fas fa-history"></i> تاریخچه معاملات</a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-page="analysis"><i class="fas fa-chart-bar"></i> تحلیل پیشرفته</a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-page="settings"><i class="fas fa-cog"></i> تنظیمات</a></li>
+                <hr style="border-color: rgba(0,0,0,0.05); margin: 15px 0;">
+                <li class="nav-item"><a href="#" id="import-btn"><i class="fas fa-upload"></i> بارگذاری فایل (Import)</a></li>
+                <li class="nav-item"><a href="#" id="export-btn"><i class="fas fa-download"></i> ذخیره فایل (Export)</a></li>
+            </ul>
+            <p class="Dev">Developed By Gomurc ❤️</p>
+        </aside>
+
+        <main class="main-content">
+            <div class="header">
+                <h1 id="page-title">داشبورد</h1>
+                <button class="menu-toggle" id="menu-toggle"><i class="fas fa-bars"></i></button>
+            </div>
+
+            <div id="dashboard" class="page active">
+                <div class="card">
+                    <h2 class="card-title"><i class="fas fa-chart-pie"></i> آمار عملکرد کلی</h2>
+                    <div class="stats-grid" id="stats-grid-dashboard"></div>
+                </div>
+                <div class="card">
+                    <h2 class="card-title"><i class="fas fa-money-check-alt"></i> نمودار رشد سرمایه</h2>
+                    <div style="height: 400px;"><canvas id="equityChart"></canvas></div>
+                </div>
+            </div>
+
+            <div id="add-trade" class="page">
+                <div class="card">
+                    <h2 class="card-title" id="form-title"><i class="fas fa-edit"></i> ثبت معامله جدید</h2>
+                    <form id="tradeForm">
+                        <input type="hidden" id="editId">
+                        <div class="form-grid">
+                           <div class="form-group"><label>نماد معاملاتی</label><input type="text" id="symbol" required></div>
+                           <div class="form-group"><label>تاریخ و زمان</label><input type="datetime-local" id="date" required></div>
+                           <div class="form-group"><label>نوع</label><select id="type"><option value="buy">خرید</option><option value="sell">فروش</option></select></div>
+                           <div class="form-group"><label>نتیجه</label><select id="result"><option value="win">سود</option><option value="loss">ضرر</option><option value="break-even">بدون سود/ضرر</option></select></div>
+                           <div class="form-group"><label>قیمت ورود</label><input type="number" id="price" step="any" required></div>
+                           <div class="form-group"><label>میزان سود/ضرر ($)</label><input type="number" id="pnl" step="any"></div>
+                           <div class="form-group"><label>حد ضرر</label><input type="number" id="stopLoss" step="any"></div>
+                           <div class="form-group"><label>حد سود</label><input type="number" id="takeProfit" step="any"></div>
+                           <div class="form-group"><label>سشن</label><select id="session"><option value="asia">آسیا</option><option value="london">لندن</option><option value="newyork">نیویورک</option></select></div>
+                           <div class="form-group"><label>امتیاز اجرا (1-5)</label><select id="executionRating"><option value="5">5 (عالی)</option><option value="4">4 (خوب)</option><option value="3">3 (متوسط)</option><option value="2">2 (ضعیف)</option><option value="1">1 (بسیار ضعیف)</option></select></div>
+                           <div style="grid-column: 1 / -1;"><label>برچسب‌ها (با کاما جدا کنید)</label><input type="text" id="tags" placeholder="مثلا: روند صعودی, شکست ساختار, اشتباه-FOMO"></div>
+                        </div>
+                        <div class="form-group" style="margin-top:20px;"><label>توضیحات</label><textarea id="notes" rows="4"></textarea></div>
+                        <div class="form-group" style="margin-top:20px;"><label>تصویر چارت (اختیاری)</label><input type="file" id="image" accept="image/*"></div>
+                        <button type="submit" id="submitBtn" style="margin-top:20px;"><i class="fas fa-save"></i> ثبت</button>
+                        <button type="button" id="cancelEditBtn" style="display: none; background: #a0aec0; margin-right:10px;"><i class="fas fa-times"></i> لغو</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div id="history" class="page">
+                 <div class="card">
+                    <h2 class="card-title"><i class="fas fa-filter"></i> فیلتر و جستجو</h2>
+                    <div class="form-grid">
+                        <div><label>نتیجه</label><select id="resultFilter"><option value="all">همه</option><option value="win">سود</option><option value="loss">ضرر</option></select></div>
+                        <div><label>سشن</label><select id="sessionFilter"><option value="all">همه</option><option value="asia">آسیا</option><option value="london">لندن</option><option value="newyork">نیویورک</option></select></div>
+                        <div style="grid-column: 1 / -1;"><label>جستجو در نماد و توضیحات</label><input type="text" id="symbolFilter" placeholder="جستجو..."></div>
+                        <div style="grid-column: 1 / -1;"><label>جستجو بر اساس برچسب</label><input type="text" id="tagFilter" placeholder="یک تگ را وارد کنید..."></div>
+                    </div>
+                     <button id="resetFiltersBtn" style="background: #a0aec0; margin-top: 15px;"><i class="fas fa-redo"></i> بازنشانی</button>
+                </div>
+                <div class="card">
+                    <h2 class="card-title"><i class="fas fa-history"></i> تاریخچه معاملات</h2>
+                    <div class="table-container">
+                        <table class="trades-table">
+                            <thead><tr><th>تاریخ</th><th>نماد</th><th>نتیجه</th><th>سود/ضرر</th><th>R/R</th><th>R-Multiple</th><th>امتیاز</th><th>عملیات</th></tr></thead>
+                            <tbody id="tradesTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="analysis" class="page">
+                <div class="card">
+                    <h2 class="card-title"><i class="fas fa-tags"></i> تحلیل بر اساس برچسب‌ها</h2>
+                    <div class="table-container" id="analysisByTag"></div>
+                </div>
+                <div class="card">
+                    <h2 class="card-title"><i class="fas fa-dollar-sign"></i> تحلیل بر اساس نماد معاملاتی</h2>
+                    <div class="table-container" id="analysisBySymbol"></div>
+                </div>
+                <div class="card">
+                    <h2 class="card-title"><i class="far fa-calendar-alt"></i> تحلیل بر اساس روز هفته</h2>
+                    <div class="table-container" id="analysisByDay"></div>
+                </div>
+            </div>
+
+            <div id="settings" class="page">
+                <div class="card">
+                    <h2 class="card-title"><i class="fas fa-user-cog"></i> مدیریت حساب‌ها</h2>
+                    <form id="accountForm">
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr auto; align-items: flex-end;">
+                           <div class="form-group"><label>نام حساب جدید</label><input type="text" id="accountName" placeholder="مثال: حساب اصلی" required></div>
+                           <div class="form-group"><label>موجودی اولیه ($)</label><input type="number" id="initialBalance" placeholder="1000" step="any" required></div>
+                           <button type="submit"><i class="fas fa-plus"></i> ایجاد حساب</button>
+                        </div>
+                    </form>
+                </div>
+                 <div class="card">
+                    <h2 class="card-title"><i class="fas fa-list-ul"></i> لیست حساب‌ها</h2>
+                    <p id="accountsList" style="color: var(--text-secondary);">هنوز حسابی ایجاد نشده است.</p>
+                </div>
+            </div>
+        </main>
+        <input type="file" id="import-file-input" accept=".json" style="display: none;">
+        
+        <div id="trade-details-modal" class="modal">
+            <div class="modal-content">
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <h2 class="card-title" id="modal-title">جزئیات معامله</h2>
+                <div class="modal-details-grid">
+                    <div><strong>نماد:</strong> <span id="modal-symbol"></span></div>
+                    <div><strong>تاریخ:</strong> <span id="modal-date"></span></div>
+                    <div><strong>نوع:</strong> <span id="modal-type"></span></div>
+                    <div><strong>نتیجه:</strong> <span id="modal-result"></span></div>
+                    <div><strong>سود/ضرر:</strong> <span id="modal-pnl"></span></div>
+                    <div><strong>قیمت ورود:</strong> <span id="modal-price"></span></div>
+                    <div><strong>حد ضرر:</strong> <span id="modal-sl"></span></div>
+                    <div><strong>حد سود:</strong> <span id="modal-tp"></span></div>
+                    <div><strong>R/R محاسبه‌شده:</strong> <span id="modal-rr"></span></div>
+                    <div><strong>R-Multiple نهایی:</strong> <span id="modal-rmultiple"></span></div>
+                    <div><strong>سشن:</strong> <span id="modal-session"></span></div>
+                    <div><strong>امتیاز اجرا:</strong> <span id="modal-rating"></span></div>
+                </div>
+                <div><strong>برچسب‌ها:</strong> <span id="modal-tags"></span></div>
+                <hr style="margin: 20px 0; border-color: rgba(0,0,0,0.05);">
+                <div><strong>توضیحات:</strong><p id="modal-notes" style="white-space: pre-wrap; margin-top: 5px;"></p></div>
+                <img id="modal-image" class="modal-image" style="display:none;">
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // --- DATABASE SETUP (Upgraded to V4 for new features) ---
+        const db = new Dexie('TradingJournalDB_V4');
+        db.version(4).stores({
+            accounts: '++id, &name',
+            trades: '++id, accountId, date, *tags' // *tags enables multi-entry indexing
+        });
+
+        // --- GLOBAL STATE ---
+        let trades = [], filteredTrades = [], equityChart;
+        let accounts = [], currentAccountId = null;
+
+        // --- UI ELEMENTS ---
+        const pageElements = {
+            navLinks: document.querySelectorAll('.nav-link'),
+            pages: document.querySelectorAll('.page'),
+            pageTitle: document.getElementById('page-title'),
+            menuToggle: document.getElementById('menu-toggle'),
+            sidebar: document.getElementById('sidebar'),
+            accountSelector: document.getElementById('accountSelector'),
+            accountsList: document.getElementById('accountsList'),
+            statsContainer: document.getElementById('stats-grid-dashboard'),
+            tradesTableBody: document.getElementById('tradesTableBody'),
+            equityChartCtx: document.getElementById('equityChart').getContext('2d'),
+            modal: document.getElementById('trade-details-modal')
+        };
+        
+        const formElements = {
+            form: document.getElementById('tradeForm'), editId: document.getElementById('editId'),
+            symbol: document.getElementById('symbol'), date: document.getElementById('date'),
+            type: document.getElementById('type'), result: document.getElementById('result'),
+            price: document.getElementById('price'), pnl: document.getElementById('pnl'),
+            stopLoss: document.getElementById('stopLoss'), takeProfit: document.getElementById('takeProfit'),
+            session: document.getElementById('session'), executionRating: document.getElementById('executionRating'),
+            tags: document.getElementById('tags'), notes: document.getElementById('notes'),
+            image: document.getElementById('image'), submitBtn: document.getElementById('submitBtn'),
+            cancelEditBtn: document.getElementById('cancelEditBtn'),
+            accountForm: document.getElementById('accountForm')
+        };
+
+        const filterElements = {
+            result: document.getElementById('resultFilter'), session: document.getElementById('sessionFilter'),
+            symbol: document.getElementById('symbolFilter'), tag: document.getElementById('tagFilter'),
+            resetBtn: document.getElementById('resetFiltersBtn')
+        };
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initializeAccounts();
+            setupEventListeners();
+            resetForm();
+        });
+
+        async function initializeAccounts() {
+            accounts = await db.accounts.toArray();
+            currentAccountId = localStorage.getItem('currentAccountId') ? parseInt(localStorage.getItem('currentAccountId')) : null;
+            if (!accounts.length) {
+                pageElements.statsContainer.innerHTML = `<p>برای شروع، لطفاً از بخش <a href="#" onclick="switchPage('settings')">تنظیمات</a> یک حساب جدید ایجاد کنید.</p>`;
+                renderAll(); return;
+            }
+            if (!currentAccountId || !accounts.some(acc => acc.id === currentAccountId)) {
+                currentAccountId = accounts[0].id;
+                localStorage.setItem('currentAccountId', currentAccountId);
+            }
+            populateAccountSelector();
+            await loadAccountData();
+        }
+
+        function setupEventListeners() {
+            pageElements.navLinks.forEach(link => link.addEventListener('click', e => { e.preventDefault(); switchPage(link.dataset.page); }));
+            pageElements.menuToggle.addEventListener('click', () => pageElements.sidebar.classList.toggle('active'));
+            pageElements.accountSelector.addEventListener('change', handleAccountSwitch);
+            formElements.form.addEventListener('submit', handleFormSubmit);
+            formElements.accountForm.addEventListener('submit', handleAccountFormSubmit);
+            filterElements.resetBtn.addEventListener('click', resetFilters);
+            formElements.cancelEditBtn.addEventListener('click', resetForm);
+            document.getElementById('import-btn').addEventListener('click', e => { e.preventDefault(); document.getElementById('import-file-input').click(); });
+            document.getElementById('export-btn').addEventListener('click', e => { e.preventDefault(); exportData(); });
+            document.getElementById('import-file-input').addEventListener('change', importData);
+            Object.values(filterElements).forEach(el => el.addEventListener('input', applyFilters));
+        }
+
+        // --- PAGE & ACCOUNT MANAGEMENT ---
+        function switchPage(pageId) {
+            pageElements.pages.forEach(p => p.classList.remove('active')); pageElements.navLinks.forEach(l => l.classList.remove('active'));
+            const targetPage = document.getElementById(pageId); const targetLink = document.querySelector(`.nav-link[data-page="${pageId}"]`);
+            if (targetPage) targetPage.classList.add('active');
+            if (targetLink) { targetLink.classList.add('active'); pageElements.pageTitle.textContent = targetLink.textContent.trim(); }
+            if (pageElements.sidebar.classList.contains('active')) pageElements.sidebar.classList.remove('active');
+        }
+
+        async function handleAccountSwitch() {
+            currentAccountId = parseInt(pageElements.accountSelector.value);
+            localStorage.setItem('currentAccountId', currentAccountId);
+            await loadAccountData();
+        }
+        
+        function populateAccountSelector() {
+            pageElements.accountSelector.innerHTML = ''; pageElements.accountsList.innerHTML = '';
+            if (accounts.length > 0) {
+                accounts.forEach(acc => {
+                    const option = document.createElement('option');
+                    option.value = acc.id; option.textContent = acc.name;
+                    pageElements.accountSelector.appendChild(option);
+                    pageElements.accountsList.innerHTML += `<p><b>${acc.name}</b> - موجودی اولیه: $${acc.initialBalance}</p>`;
+                });
+                pageElements.accountSelector.value = currentAccountId;
+            } else { pageElements.accountsList.innerHTML = 'هنوز حسابی ایجاد نشده است.'; }
+        }
+
+        async function loadAccountData() {
+            trades = currentAccountId ? await db.trades.where('accountId').equals(currentAccountId).toArray() : [];
+            applyFilters();
+        }
+
+        // --- FORM HANDLING ---
+        async function handleAccountFormSubmit(e) { e.preventDefault(); try { await db.accounts.add({ name: document.getElementById('accountName').value, initialBalance: parseFloat(document.getElementById('initialBalance').value) }); alert(`حساب با موفقیت ایجاد شد.`); formElements.accountForm.reset(); await initializeAccounts(); } catch (error) { alert("خطا: نام حساب باید منحصر به فرد باشد."); } }
+        
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            if (!currentAccountId) { alert("لطفاً ابتدا یک حساب ایجاد و انتخاب کنید."); return; }
+
+            let pnlValue = parseFloat(formElements.pnl.value) || 0;
+            if (formElements.result.value === 'loss') pnlValue = -Math.abs(pnlValue);
+            
+            const price = parseFloat(formElements.price.value);
+            const stopLoss = parseFloat(formElements.stopLoss.value);
+            const takeProfit = parseFloat(formElements.takeProfit.value);
+            
+            let riskReward = 0, rMultiple = 0;
+            const riskAmount = Math.abs(price - stopLoss);
+            if(riskAmount > 0) {
+                if(takeProfit) riskReward = Math.abs(takeProfit - price) / riskAmount;
+                if(pnlValue !== 0) rMultiple = pnlValue / riskAmount;
+            }
+
+            const tradeData = {
+                accountId: currentAccountId,
+                symbol: formElements.symbol.value, date: formElements.date.value, type: formElements.type.value,
+                result: formElements.result.value, price: price, pnl: pnlValue, stopLoss: stopLoss || null,
+                takeProfit: takeProfit || null, session: formElements.session.value, 
+                executionRating: parseInt(formElements.executionRating.value),
+                tags: formElements.tags.value.split(',').map(tag => tag.trim()).filter(Boolean),
+                notes: formElements.notes.value,
+                riskReward: riskReward,
+                rMultiple: rMultiple,
+            };
+
+            const imageFile = formElements.image.files[0];
+            if (imageFile) {
+                tradeData.imageBase64 = await toBase64(imageFile);
+            } else if (parseInt(formElements.editId.value)) {
+                const existingTrade = await db.trades.get(parseInt(formElements.editId.value));
+                if (existingTrade && existingTrade.imageBase64) {
+                    tradeData.imageBase64 = existingTrade.imageBase64;
+                }
+            }
+
+            const editId = parseInt(formElements.editId.value);
+            if (editId) { await db.trades.update(editId, tradeData); } else { await db.trades.add(tradeData); }
+            await loadAccountData(); resetForm(); switchPage('history');
+        }
+
+        window.deleteTrade = async (id) => { if (confirm('آیا از حذف این معامله مطمئن هستید؟')) { await db.trades.delete(id); await loadAccountData(); }};
+
+        window.editTrade = async (id) => {
+            const trade = await db.trades.get(id); if (!trade) return;
+            Object.keys(formElements).forEach(key => { if(formElements[key] && trade[key] !== undefined) {
+                if(key === 'tags') formElements[key].value = trade[key].join(', ');
+                else formElements[key].value = trade[key];
+            }});
+            formElements.editId.value = id;
+            formElements.submitBtn.innerHTML = '<i class="fas fa-sync-alt"></i> به‌روزرسانی';
+            formElements.cancelEditBtn.style.display = 'inline-block';
+            document.getElementById('form-title').textContent = 'ویرایش معامله';
+            switchPage('add-trade');
+        };
+        
+        function resetForm() {
+             formElements.form.reset();
+             formElements.date.value = new Date(new Date().toString().split('GMT')[0]+' UTC').toISOString().slice(0, 16);
+             formElements.editId.value = '';
+             formElements.submitBtn.innerHTML = '<i class="fas fa-save"></i> ثبت';
+             formElements.cancelEditBtn.style.display = 'none';
+             document.getElementById('form-title').textContent = 'ثبت معامله جدید';
+        }
+
+        // --- FILTERING & RENDERING ---
+        function applyFilters() {
+            const f = { result: filterElements.result.value, session: filterElements.session.value, search: filterElements.symbol.value.toLowerCase(), tag: filterElements.tag.value.toLowerCase().trim() };
+            filteredTrades = trades.filter(t => { 
+                if (f.result !== 'all' && t.result !== f.result) return false; 
+                if (f.session !== 'all' && t.session !== f.session) return false; 
+                if (f.search && !(t.symbol.toLowerCase().includes(f.search) || (t.notes && t.notes.toLowerCase().includes(f.search)))) return false; 
+                if (f.tag && !t.tags.some(tag => tag.toLowerCase().includes(f.tag))) return false;
+                return true; 
+            });
+            renderAll();
+        }
+
+        function renderAll() {
+            renderTradesTable(); 
+            updateStats(); 
+            renderEquityChart();
+            renderAnalysisReports();
+        }
+        
+        function resetFilters() { filterElements.result.value = 'all'; filterElements.session.value = 'all'; filterElements.symbol.value = ''; filterElements.tag.value = ''; applyFilters(); }
+        
+        function renderTradesTable() {
+            pageElements.tradesTableBody.innerHTML = '';
+            if (!currentAccountId || trades.length === 0) { pageElements.tradesTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center;">هیچ معامله‌ای برای این حساب ثبت نشده است.</td></tr>'; return; }
+            if (filteredTrades.length === 0) { pageElements.tradesTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center;">هیچ معامله‌ای با این فیلتر یافت نشد.</td></tr>'; return; }
+            filteredTrades.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(trade => {
+                const row = pageElements.tradesTableBody.insertRow();
+                const pnlClass = trade.pnl > 0 ? 'profit' : (trade.pnl < 0 ? 'loss' : '');
+                row.innerHTML = `
+                    <td>${new Date(trade.date).toLocaleDateString('fa-IR')}</td> <td>${trade.symbol}</td>
+                    <td>${trade.result}</td> <td class="${pnlClass}">${trade.pnl.toFixed(2)} $</td>
+                    <td>${trade.riskReward ? `1:${trade.riskReward.toFixed(2)}` : '-'}</td>
+                    <td>${trade.rMultiple ? trade.rMultiple.toFixed(2)+'R' : '-'}</td>
+                    <td>${'⭐'.repeat(trade.executionRating)}</td>
+                    <td>
+                        <button class="action-btn" onclick="viewTradeDetails(${trade.id})" title="نمایش جزئیات"><i class="fas fa-eye"></i></button>
+                        <button class="action-btn" onclick="editTrade(${trade.id})" title="ویرایش"><i class="fas fa-edit"></i></button>
+                        <button class="action-btn" onclick="deleteTrade(${trade.id})" title="حذف"><i class="fas fa-trash"></i></button>
+                    </td>`;
+            });
+        }
+        
+        function updateStats() {
+            if (!currentAccountId) { pageElements.statsContainer.innerHTML = ''; return; }
+            const currentAccount = accounts.find(acc => acc.id === currentAccountId); if (!currentAccount) return;
+            const completed = filteredTrades.filter(t => t.result === 'win' || t.result === 'loss'), wins = completed.filter(t => t.result === 'win');
+            const winRate = completed.length ? (wins.length / completed.length * 100) : 0;
+            const netPnl = filteredTrades.reduce((sum, trade) => sum + (trade.pnl || 0), 0);
+            const currentBalance = currentAccount.initialBalance + netPnl;
+            pageElements.statsContainer.innerHTML = `
+                <div class="stat-card"><div class="stat-label">موجودی فعلی</div><div class="stat-value">${currentBalance.toFixed(2)}$</div></div>
+                <div class="stat-card"><div class="stat-label">سود/ضرر خالص</div><div class="stat-value" style="color:${netPnl >= 0 ? 'var(--positive)' : 'var(--negative)'}">${netPnl.toFixed(2)}$</div></div>
+                <div class="stat-card"><div class="stat-label">نرخ موفقیت</div><div class="stat-value" style="color:var(--positive)">${winRate.toFixed(1)}%</div></div>
+                <div class="stat-card"><div class="stat-label">تعداد کل معاملات</div><div class="stat-value">${filteredTrades.length}</div></div>`;
+        }
+        
+        function renderEquityChart() {
+            if (equityChart) equityChart.destroy();
+            if (!currentAccountId) return;
+            const currentAccount = accounts.find(acc => acc.id === currentAccountId); if (!currentAccount) return;
+            const sorted = [...filteredTrades].sort((a, b) => new Date(a.date) - new Date(b.date));
+            const labels = ["شروع"], equityData = [currentAccount.initialBalance];
+            let cumulativePnl = 0;
+            sorted.forEach(trade => {
+                cumulativePnl += (trade.pnl || 0);
+                equityData.push(currentAccount.initialBalance + cumulativePnl);
+                labels.push(new Date(trade.date).toLocaleDateString('fa-IR'));
+            });
+            equityChart = new Chart(pageElements.equityChartCtx, { type: 'line', data: { labels: labels, datasets: [{ label: 'رشد سرمایه ($)', data: equityData, borderColor: '#a0c4ff', backgroundColor: 'rgba(160, 196, 255, 0.2)', borderWidth: 2, fill: true, tension: 0.1 }] }, options: { responsive: true, maintainAspectRatio: false } });
+        }
+
+        // --- ANALYSIS PAGE ---
+        function renderAnalysisReports() {
+            if (!currentAccountId || !document.getElementById('analysis').classList.contains('active')) return;
+            const reportGenerators = {
+                'analysisByTag': trades => groupAndAnalyze(trades, trade => trade.tags, 'برچسب'),
+                'analysisBySymbol': trades => groupAndAnalyze(trades, trade => [trade.symbol], 'نماد'),
+                'analysisByDay': trades => groupAndAnalyze(trades, trade => [new Date(trade.date).toLocaleDateString('fa-IR', { weekday: 'long' })], 'روز هفته')
+            };
+            for(const [elementId, generator] of Object.entries(reportGenerators)) {
+                document.getElementById(elementId).innerHTML = generator(filteredTrades);
+            }
+        }
+        function groupAndAnalyze(trades, keyExtractor, keyName) {
+            const groups = {};
+            trades.forEach(trade => {
+                const keys = keyExtractor(trade);
+                keys.forEach(key => {
+                    if (!key) return;
+                    if (!groups[key]) groups[key] = { trades: [], wins: 0, totalPnl: 0 };
+                    groups[key].trades.push(trade);
+                    if (trade.result === 'win') groups[key].wins++;
+                    groups[key].totalPnl += trade.pnl;
+                });
+            });
+
+            if(Object.keys(groups).length === 0) return '<p>داده‌ای برای تحلیل وجود ندارد.</p>';
+            
+            let table = `<table class="trades-table"><thead><tr><th>${keyName}</th><th>تعداد معاملات</th><th>نرخ موفقیت</th><th>سود/ضرر خالص</th></tr></thead><tbody>`;
+            Object.entries(groups).sort((a,b) => b[1].trades.length - a[1].trades.length).forEach(([key, data]) => {
+                const winRate = data.trades.length > 0 ? (data.wins / data.trades.length * 100) : 0;
+                table += `<tr><td>${key}</td><td>${data.trades.length}</td><td>${winRate.toFixed(1)}%</td><td class="${data.totalPnl >= 0 ? 'profit' : 'loss'}">${data.totalPnl.toFixed(2)}$</td></tr>`;
+            });
+            return table + '</tbody></table>';
+        }
+
+        // --- MODAL ---
+        window.viewTradeDetails = async (id) => {
+            const trade = await db.trades.get(id); if (!trade) return;
+            document.getElementById('modal-symbol').textContent = trade.symbol;
+            document.getElementById('modal-date').textContent = new Date(trade.date).toLocaleString('fa-IR');
+            document.getElementById('modal-type').innerHTML = `<span class="${trade.type}">${trade.type === 'buy' ? 'خرید' : 'فروش'}</span>`;
+            document.getElementById('modal-result').textContent = trade.result;
+            document.getElementById('modal-pnl').innerHTML = `<span class="${trade.pnl >= 0 ? 'profit':'loss'}">${trade.pnl.toFixed(2)} $</span>`;
+            document.getElementById('modal-price').textContent = trade.price;
+            document.getElementById('modal-sl').textContent = trade.stopLoss || '-';
+            document.getElementById('modal-tp').textContent = trade.takeProfit || '-';
+            document.getElementById('modal-rr').textContent = trade.riskReward ? `1:${trade.riskReward.toFixed(2)}` : '-';
+            document.getElementById('modal-rmultiple').textContent = trade.rMultiple ? `${trade.rMultiple.toFixed(2)}R` : '-';
+            document.getElementById('modal-session').textContent = trade.session;
+            document.getElementById('modal-rating').textContent = '⭐'.repeat(trade.executionRating);
+            document.getElementById('modal-tags').innerHTML = trade.tags.map(t => `<span class="tag">${t}</span>`).join('');
+            document.getElementById('modal-notes').textContent = trade.notes || '-';
+            const imgEl = document.getElementById('modal-image');
+            if (trade.imageBase64) {
+                imgEl.src = trade.imageBase64;
+                imgEl.style.display = 'block';
+            } else {
+                imgEl.style.display = 'none';
+            }
+            pageElements.modal.style.display = 'flex';
+        }
+        window.closeModal = () => { pageElements.modal.style.display = 'none'; }
+        
+        // --- UTILITIES (Import/Export, Base64) ---
+        const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = reject; });
+        
+        async function importData(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    // Check for the new, valid structure
+                    if (!data.account || !Array.isArray(data.trades)) {
+                        throw new Error("ساختار فایل معتبر نیست. فایل باید شامل اطلاعات حساب و معاملات باشد.");
+                    }
+                    if (confirm(`آیا می‌خواهید یک حساب جدید با نام "${data.account.name}" و ${data.trades.length} معامله ایجاد کنید؟`)) {
+                        let newAccountName = data.account.name;
+                        // Handle potential duplicate account names
+                        while(await db.accounts.where('name').equals(newAccountName).count() > 0) {
+                            newAccountName = `${newAccountName} (کپی)`;
+                        }
+
+                        // Add the new account and get its ID
+                        const newAccountId = await db.accounts.add({
+                            name: newAccountName,
+                            initialBalance: data.account.initialBalance
+                        });
+                        
+                        // Prepare trades with the new accountId
+                        const tradesToImport = data.trades.map(trade => ({ ...trade, accountId: newAccountId }));
+                        if(tradesToImport.length > 0) {
+                           await db.trades.bulkAdd(tradesToImport);
+                        }
+
+                        alert(`حساب "${newAccountName}" با موفقیت بارگذاری شد.`);
+                        // Refresh the app to show the new account
+                        await initializeAccounts();
+                    }
+                } catch (err) { alert("خطا در بارگذاری فایل: " + err.message); console.error(err); }
+            };
+            reader.readAsText(file);
+            e.target.value = ''; // Reset file input
+        }
+
+        async function exportData() {
+            if (!currentAccountId) { alert("لطفاً یک حساب را برای ذخیره انتخاب کنید."); return; }
+            const currentAccount = accounts.find(acc => acc.id === currentAccountId);
+            const tradesToExport = await db.trades.where('accountId').equals(currentAccountId).toArray();
+            if (!currentAccount) return;
+
+            // Create a structured object for export
+            const exportObject = {
+                account: {
+                    name: currentAccount.name,
+                    initialBalance: currentAccount.initialBalance
+                },
+                // Remove database-specific IDs before exporting
+                trades: tradesToExport.map(({ id, accountId, ...rest }) => rest) 
+            };
+            
+            const dataStr = JSON.stringify(exportObject, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            a.href = url;
+            a.download = `journal_${currentAccount.name.replace(/\s+/g, '_')}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            alert("فایل پشتیبان حساب فعلی با موفقیت آماده دانلود شد.");
+        }
+    </script>
+</body>
+</html>
